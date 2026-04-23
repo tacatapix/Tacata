@@ -26,6 +26,7 @@ class FYZUPIXK_Config
 	ref array<ref FYZUPIXK_KOTHConfig> KOTHs;
 	ref array<ref FYZUPIXK_Reward_Containers> Reward_Containers;
 	ref array<ref FYZUPIXK_LootConfig> Loot;
+	ref array<ref FYZUPIXK_LootTier> LootTiers;
 	
 	void FYZUPIXK_Config()
 	{
@@ -33,6 +34,7 @@ class FYZUPIXK_Config
 		KOTHs = new ref array<ref FYZUPIXK_KOTHConfig>();
 		Reward_Containers = new ref array<ref FYZUPIXK_Reward_Containers>();
 		Loot = new ref array<ref FYZUPIXK_LootConfig>();
+		LootTiers = new ref array<ref FYZUPIXK_LootTier>();
 	}
 	
 	void ~FYZUPIXK_Config()
@@ -45,6 +47,8 @@ class FYZUPIXK_Config
 		this.Reward_Containers = NULL;
 		if(this.Loot) this.Loot.Clear();
 		this.Loot = NULL;
+		if(this.LootTiers) this.LootTiers.Clear();
+		this.LootTiers = NULL;
 	}
 	
 	protected void SaveConfigs()
@@ -70,17 +74,26 @@ class FYZUPIXK_Config
 		Reward_Containers.Insert(new FYZUPIXK_Reward_Containers("fyzupix_KOTHchest_SupplyBox2", false));
 		Reward_Containers.Insert(new FYZUPIXK_Reward_Containers("fyzupix_KOTHchest_SupplyBox3", false));
 		
-		Loot.Insert(new FYZUPIXK_LootConfig("FAL", 100, 2, -1, "Mag_FAL_20Rnd", {"Fal_OeBttsck","ACOGOptic"},{"Mag_FAL_20Rnd","Mag_FAL_20Rnd"}));
-		Loot.Insert(new FYZUPIXK_LootConfig("SVD", 100, 2, -1, "Mag_SVD_10Rnd", {"PSO1Optic"},{"Mag_SVD_10Rnd","Mag_SVD_10Rnd"}));
-		Loot.Insert(new FYZUPIXK_LootConfig("PlateCarrierVest", 100, 2, -1, "", NULL, NULL, {"PlateCarrierVest_Black","PlateCarrierVest_Camo"}));
-		Loot.Insert(new FYZUPIXK_LootConfig("BallisticHelmet_Green", 100, 2, -1, "", NULL, NULL, {"BallisticHelmet_Black","BallisticHelmet_Woodland"}));
-		Loot.Insert(new FYZUPIXK_LootConfig("BandageDressing", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("PainkillerTablets", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("Morphine", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("SledgeHammer", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("NailBox", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("Hatchet", 100, 2, -1));
-		Loot.Insert(new FYZUPIXK_LootConfig("MetalPlate", 100, 2, -1));
+		//Default tiers: weighted roll picks a tier per reward slot.
+		//Example weights (sum doesn't have to be 100 - they're relative):
+		//  T1=60 trash, T2=25 common, T3=10 rare, T4=5 legendary.
+		LootTiers.Insert(new FYZUPIXK_LootTier(1, 60, "Trash"));
+		LootTiers.Insert(new FYZUPIXK_LootTier(2, 25, "Common"));
+		LootTiers.Insert(new FYZUPIXK_LootTier(3, 10, "Rare"));
+		LootTiers.Insert(new FYZUPIXK_LootTier(4, 5,  "Legendary"));
+
+		//Loot items. Last arg is Tier (1..N). If you leave it out it defaults to 1.
+		Loot.Insert(new FYZUPIXK_LootConfig("FAL", 100, 2, -1, "Mag_FAL_20Rnd", {"Fal_OeBttsck","ACOGOptic"},{"Mag_FAL_20Rnd","Mag_FAL_20Rnd"}, NULL, 4));
+		Loot.Insert(new FYZUPIXK_LootConfig("SVD", 100, 2, -1, "Mag_SVD_10Rnd", {"PSO1Optic"},{"Mag_SVD_10Rnd","Mag_SVD_10Rnd"}, NULL, 4));
+		Loot.Insert(new FYZUPIXK_LootConfig("PlateCarrierVest", 100, 2, -1, "", NULL, NULL, {"PlateCarrierVest_Black","PlateCarrierVest_Camo"}, 3));
+		Loot.Insert(new FYZUPIXK_LootConfig("BallisticHelmet_Green", 100, 2, -1, "", NULL, NULL, {"BallisticHelmet_Black","BallisticHelmet_Woodland"}, 3));
+		Loot.Insert(new FYZUPIXK_LootConfig("BandageDressing", 100, 2, -1, "", NULL, NULL, NULL, 1));
+		Loot.Insert(new FYZUPIXK_LootConfig("PainkillerTablets", 100, 2, -1, "", NULL, NULL, NULL, 1));
+		Loot.Insert(new FYZUPIXK_LootConfig("Morphine", 100, 2, -1, "", NULL, NULL, NULL, 2));
+		Loot.Insert(new FYZUPIXK_LootConfig("SledgeHammer", 100, 2, -1, "", NULL, NULL, NULL, 2));
+		Loot.Insert(new FYZUPIXK_LootConfig("NailBox", 100, 2, -1, "", NULL, NULL, NULL, 1));
+		Loot.Insert(new FYZUPIXK_LootConfig("Hatchet", 100, 2, -1, "", NULL, NULL, NULL, 1));
+		Loot.Insert(new FYZUPIXK_LootConfig("MetalPlate", 100, 2, -1, "", NULL, NULL, NULL, 2));
 		
 		SaveConfigs();
 	}
@@ -622,17 +635,19 @@ class FYZUPIXK_LootConfig
 	int Spawn_Chance;
 	int Max_Spawnable;
 	int Quantity;
+	int Tier;
 	ref TStringArray Attach;
 	ref TStringArray Extra_Items;
 	ref TStringArray Alternatives;
 	
-	void FYZUPIXK_LootConfig(string sClass, int spawnChance, int maxSpawn, int maxQty, string magClass = "", TStringArray sAtt = NULL, TStringArray sLoot = NULL, TStringArray sAlternatives = NULL)
+	void FYZUPIXK_LootConfig(string sClass, int spawnChance, int maxSpawn, int maxQty, string magClass = "", TStringArray sAtt = NULL, TStringArray sLoot = NULL, TStringArray sAlternatives = NULL, int tier = 1)
 	{
 		ClassName = sClass;
 		Magazine_ClassName = magClass;
 		Spawn_Chance = spawnChance;
 		Max_Spawnable = maxSpawn;
 		Quantity = maxQty;
+		Tier = tier;
 		Attach = sAtt;
 		Extra_Items = sLoot;
 		Alternatives = sAlternatives;
@@ -649,6 +664,7 @@ class FYZUPIXK_LootConfig
 		this.Spawn_Chance = 0;
 		this.Max_Spawnable = 0;
 		this.Quantity = 0;
+		this.Tier = 0;
 
 		if(this.Attach) this.Attach.Clear();
 		this.Attach = NULL;
@@ -656,6 +672,12 @@ class FYZUPIXK_LootConfig
 		this.Extra_Items = NULL;
 		if(this.Alternatives) this.Alternatives.Clear();
 		this.Alternatives = NULL;
+	}
+
+	int GetTier()
+	{
+		if(Tier <= 0) return 1;
+		return Tier;
 	}
 	
 	string GetClassname()
@@ -696,5 +718,42 @@ class FYZUPIXK_LootConfig
 	TStringArray GetAlternatives()
 	{
 		return Alternatives;
+	}
+}
+
+class FYZUPIXK_LootTier
+{
+	int Tier;         //tier id (matches FYZUPIXK_LootConfig.Tier). 1..N.
+	int Weight;       //relative weight for the tier roll. Higher = more likely.
+	string Name;      //display/log name, purely cosmetic.
+
+	void FYZUPIXK_LootTier(int tier = 1, int weight = 1, string name = "")
+	{
+		Tier = tier;
+		Weight = weight;
+		Name = name;
+	}
+
+	void ~FYZUPIXK_LootTier()
+	{
+		this.Tier = 0;
+		this.Weight = 0;
+		this.Name = "";
+	}
+
+	int GetTier()
+	{
+		return Tier;
+	}
+
+	int GetWeight()
+	{
+		if(Weight < 0) return 0;
+		return Weight;
+	}
+
+	string GetName()
+	{
+		return Name;
 	}
 }

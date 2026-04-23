@@ -512,6 +512,45 @@ class FYZUPIX_KOTHEvent
 					}
 				}
 				
+				//Tiered roll: bucket eligible loot by Tier and pick a tier per slot
+				//using LootTiers[].Weight. If LootTiers is empty or no loot matches
+				//any configured tier, we fall back to the flat EligibleRewards pool.
+				ref array<ref array<int>> EligibleByTier = new array<ref array<int>>;
+				int totalTierWeight = 0;
+				int tiersCount = 0;
+				if(GetFYZUPIXKConfig().LootTiers) tiersCount = GetFYZUPIXKConfig().LootTiers.Count();
+				for(int t=0; t<tiersCount; t++)
+				{
+					EligibleByTier.Insert(new array<int>);
+				}
+				for(int ei=0; ei<EligibleRewards.Count(); ei++)
+				{
+					int lootIdx = EligibleRewards.Get(ei);
+					int itemTier = GetFYZUPIXKConfig().Loot.Get(lootIdx).GetTier();
+					for(int ti=0; ti<tiersCount; ti++)
+					{
+						if(GetFYZUPIXKConfig().LootTiers.Get(ti).GetTier() == itemTier)
+						{
+							EligibleByTier.Get(ti).Insert(lootIdx);
+							break;
+						}
+					}
+				}
+				for(int tw=0; tw<tiersCount; tw++)
+				{
+					if(EligibleByTier.Get(tw).Count() > 0)
+					{
+						totalTierWeight += GetFYZUPIXKConfig().LootTiers.Get(tw).GetWeight();
+					}
+				}
+				bool useTieredRoll = (totalTierWeight > 0);
+				
+				if(EligibleRewards.Count() == 0)
+				{
+					if(FYZUPIXKOTH.FYZUPIXK_LoggingEnabled) Print("[PackFazupix KOTH] No eligible loot passed the Spawn_Chance roll - nothing to spawn.");
+					return;
+				}
+				
 				int failSafe = FYZUPIXK_Reward_Loot_Count * 2; //Set this as you wish. If the script cant spawn enough rewards for whatever reason, this is what will stop your server from locking up.
 				int CurrentAttempts = 0;
 				int CurrentSpawnedLoot = 0;
@@ -523,7 +562,37 @@ class FYZUPIX_KOTHEvent
 				
 				while(CurrentSpawnedLoot < FYZUPIXK_Reward_Loot_Count)
 				{
-					tempChosenID = EligibleRewards.Get(Math.RandomInt(0,EligibleRewards.Count()));
+					if(useTieredRoll)
+					{
+						int roll = Math.RandomIntInclusive(1, totalTierWeight);
+						int acc = 0;
+						int chosenTierIdx = -1;
+						for(int rt=0; rt<tiersCount; rt++)
+						{
+							if(EligibleByTier.Get(rt).Count() == 0) continue;
+							acc += GetFYZUPIXKConfig().LootTiers.Get(rt).GetWeight();
+							if(roll <= acc)
+							{
+								chosenTierIdx = rt;
+								break;
+							}
+						}
+						if(chosenTierIdx < 0)
+						{
+							//Fall back to flat pool if weights left nothing selectable
+							tempChosenID = EligibleRewards.Get(Math.RandomInt(0,EligibleRewards.Count()));
+						}
+						else
+						{
+							ref array<int> tierPool = EligibleByTier.Get(chosenTierIdx);
+							tempChosenID = tierPool.Get(Math.RandomInt(0, tierPool.Count()));
+							if(FYZUPIXKOTH.FYZUPIXK_LoggingEnabled) Print("[PackFazupix KOTH] Tier roll picked '" + GetFYZUPIXKConfig().LootTiers.Get(chosenTierIdx).GetName() + "' (T" + GetFYZUPIXKConfig().LootTiers.Get(chosenTierIdx).GetTier() + ").");
+						}
+					}
+					else
+					{
+						tempChosenID = EligibleRewards.Get(Math.RandomInt(0,EligibleRewards.Count()));
+					}
 					tempClassName = GetFYZUPIXKConfig().Loot.Get(tempChosenID).GetClassname();
 					tempMagClassName = GetFYZUPIXKConfig().Loot.Get(tempChosenID).GetMagClassname();
 					tempAttachments = GetFYZUPIXKConfig().Loot.Get(tempChosenID).GetAttachments();
