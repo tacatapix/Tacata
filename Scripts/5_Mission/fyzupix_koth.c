@@ -493,14 +493,16 @@ class FYZUPIX_KOTH
 	
 	static void SendNotification(string textInput)
 	{
+		if(!GetFYZUPIXKConfig().Settings.Get(0).NotificationsEnabled()) return;
+
 		#ifdef EXPANSIONMOD
-		if(GetFYZUPIXKConfig().Settings.Get(0).NotificationsEnabled())
-		{
-			ExpansionNotification("King of The Hill", textInput, "Territory", COLOR_EXPANSION_NOTIFICATION_MISSION, 15).Create();
-		}
-		return;
+		ExpansionNotification("King of The Hill", textInput, "Territory", COLOR_EXPANSION_NOTIFICATION_MISSION, 15).Create();
 		#endif
 
+		//Vanilla NotificationSystem path. The "Notifications" Steam Workshop mod
+		//(DaemonForge, id=2353998362) overrides this UI, so players running that
+		//mod get the prettier toast automatically. Fires alongside Expansion so
+		//we reach everyone regardless of which mod they have loaded.
 		ref array<Man> all_players = new array<Man>;
 		GetGame().GetPlayers(all_players);
 		if(all_players.Count() > 0)
@@ -508,7 +510,7 @@ class FYZUPIX_KOTH
 			for(int i=0; i<all_players.Count(); i++)
 			{
 				PlayerBase player = PlayerBase.Cast(all_players.Get(i));
-						
+
 				if(player && player.IsAlive())
 				{
 					NotificationSystem.SendNotificationToPlayerExtended(player, 15, "King of The Hill", textInput, "set:dayz_inventory image:tf_flag");
